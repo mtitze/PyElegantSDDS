@@ -270,7 +270,7 @@ class ElegantCommandFile:
                 self.commandlist[: indlist[mode]] + self.commandlist[indlist[mode] + 1 :]
             )
 
-    def write(self, outputfilename="", mode="w", clear=False):
+    def write(self, outputfilename="", mode="w", clear=False, verbose=True):
         """
         Method to write the command file to external file.
 
@@ -302,6 +302,8 @@ class ElegantCommandFile:
                         else:
                             outfile.write("\t{:40s}= {},\n".format(k, v))
                 outfile.write("&end\n\n")
+        if verbose:
+             print (f'Writing command file\n{self.filename}\n')
         if clear:
             self._addHistory(self.commandlist)
             self.clear()

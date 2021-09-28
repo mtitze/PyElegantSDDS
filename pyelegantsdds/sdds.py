@@ -135,7 +135,7 @@ class SDDSCommand:
             if "file" in k.lower():
                 cmdstr += " {}".format(v)
             elif "separator" in k.lower():
-                cmdstr += ' "-separator= {}"'.format(v)
+                cmdstr += ' -separator="{}"'.format(v)
             else:
                 if v is not None:
                     cmdstr += " -{}={}".format(k.split("_")[0], v)

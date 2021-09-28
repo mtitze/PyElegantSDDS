@@ -123,7 +123,7 @@ def GenerateNDimCoordinateGrid(N, NPOINTS, pmin=1e-6, pmax=1e-4, man_ranges=None
     coordinate_grid = np.array([*grid])
     npart = coordinate_grid.size // N
     coordinate_grid = coordinate_grid.reshape(N, npart).T
-    print("Shape: {} - Number of paritcles: {} ".format(coordinate_grid.shape, npart))
+    print("Shape: {} - Number of particles: {} ".format(coordinate_grid.shape, npart))
     # add particle id
     coordinate_grid = np.hstack((coordinate_grid, np.array(range(1, npart + 1)).reshape(npart, 1)))
     # print(coordinate_grid)
@@ -271,7 +271,7 @@ class ElegantRun:
         self.clearCommands()
         self.clearCommandHistory()
 
-    def run(self):
+    def run(self, **kwargs):
         """
         Run the commandfile.
         """
@@ -289,12 +289,8 @@ class ElegantRun:
         # Debug: print(cmdstr)
 
         # run
-        with open(os.devnull, "w") as f:#
-            try:
-                subp.run(shlex.split(cmdstr), check=True, shell=True, stdout=f, stderr=subp.STDOUT)
-            except subp.CalledProcessError as e:
-                print( e.output.decode() ) 
-        #    subp.call(shlex.split(cmdstr), stdout=f)
+        with open(os.devnull, "w") as f:
+            subp.call(shlex.split(cmdstr), stdout=f)
 
     def add_basic_setup(self, **kwargs):
         """
@@ -690,11 +686,9 @@ class ElegantRun:
 
             # generate coordinate grid, with particle id as last column
             # and save it as plain data table seperated by a whitespace
-            particle_df = pd.DataFrame(
-                GenerateNDimCoordinateGrid(
-                    6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges
-                )
-            )
+
+            gridpoints = GenerateNDimCoordinateGrid(6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges)
+            particle_df = pd.DataFrame(gridpoints)
             particle_df.to_csv(f"{self._ROOTNAME}_plain_particles.dat", sep=" ", header=None, index=False)
 
             # cleanup kwargs
@@ -748,6 +742,8 @@ class ElegantRun:
 
         # load the pre-defined  convert plain data to sdds command
         cmd = sddscommand.get_particles_plain_2_SDDS_command(**kwargs)
+
+        import pdb; pdb.set_trace()
 
         # run the sdds command
         sddscommand.runCommand(cmd)
