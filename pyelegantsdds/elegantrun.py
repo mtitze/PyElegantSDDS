@@ -222,6 +222,7 @@ class ElegantRun:
     """
 
     _REQUIRED_KWARGS = ["use_beamline", "energy"]
+    _ROOTNAME = 'temp'
 
     def __init__(self, sif, lattice: str, parallel=False, **kwargs):
         self.sif = sif
@@ -229,7 +230,7 @@ class ElegantRun:
         self.parallel = parallel
         self.kwargs = kwargs
         self.check()
-        self.commandfile = ElegantCommandFile("temp.ele")
+        self.commandfile = ElegantCommandFile(f"{self._ROOTNAME}.ele")
 
         # setting up executable
         if parallel:
@@ -285,7 +286,7 @@ class ElegantRun:
 
         # generate command string
         # Debug: print(self.exec)
-        cmdstr = "{} temp.ele".format(self.exec)
+        cmdstr = "{} {}.ele".format(self.exec, self._ROOTNAME)
         # Debug: print(cmdstr)
 
         # run
@@ -305,7 +306,7 @@ class ElegantRun:
             # centroid="%s.cen",
             default_order=kwargs.get("default_order", 2),
             concat_order=kwargs.get("concat_order", 1),
-            rootname="temp",
+            rootname=self._ROOTNAME,
             parameters="%s.params",
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile
@@ -424,7 +425,7 @@ class ElegantRun:
             # centroid="%s.cen",
             default_order=kwargs.pop("default_order", 1),
             concat_order=kwargs.pop("concat_order", 1),
-            rootname="temp",
+            rootname=self._ROOTNAME,
             parameters="%s.params",
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile
@@ -546,12 +547,12 @@ class ElegantRun:
         self.commandfile.write()
 
         # set cmdstr and run
-        cmdstr = "{} elegant temp.ele".format(self.sif)
+        cmdstr = "{} elegant {}.ele".format(self.sif, self._ROOTNAME)
         with open(os.devnull, "w") as f:
             subp.call(shlex.split(cmdstr), stdout=f)
 
         # load twiss output
-        twifile = SDDS(self.sif, "temp.twi", 0)
+        twifile = SDDS(self.sif, "{}.twi".format(self._ROOTNAME), 0)
         twiparams = twifile.getParameterValues()
         twidata = twifile.getColumnValues()
 
@@ -603,11 +604,11 @@ class ElegantRun:
         self.commandfile.write()
 
         # set cmdstr
-        cmdstr = "{} elegant temp.ele".format(self.sif)
+        cmdstr = "{} elegant {}.ele".format(self.sif, self._ROOTNAME)
         with open(os.devnull, "w") as f:
             subp.call(shlex.split(cmdstr), stdout=f)
 
-        with open("temp.mat", "r") as f:
+        with open(f"{self._ROOTNAME}.mat", "r") as f:
             mdata = f.read()
 
         # get full turn matrix and
@@ -639,7 +640,7 @@ class ElegantRun:
                 if not pd.isna(_value):
                     Q_dict[_key] = _value
 
-        sddsmat = SDDS(self.sif, "temp.sdds", 0)
+        sddsmat = SDDS(self.sif, f"{self._ROOTNAME}.sdds", 0)
         ElementMatrices = sddsmat.getColumnValues()
 
         return C, R, ElementMatrices, T_dict, Q_dict
@@ -691,7 +692,7 @@ class ElegantRun:
                     6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges
                 )
             )
-            particle_df.to_csv("temp_plain_particles.dat", sep=" ", header=None, index=False)
+            particle_df.to_csv(f"{self._ROOTNAME}_plain_particles.dat", sep=" ", header=None, index=False)
 
             # cleanup kwargs
             kwargs.pop("NPOINTS", None)
@@ -718,7 +719,7 @@ class ElegantRun:
                 )
             )
 
-            particle_df.to_csv("temp_plain_particles.dat", sep=" ", header=None, index=False)
+            particle_df.to_csv(f"{self._ROOTNAME}_plain_particles.dat", sep=" ", header=None, index=False)
             # clean up kwargs
             kwargs.pop("rmin", None)
             kwargs.pop("rmax", None)
@@ -739,7 +740,7 @@ class ElegantRun:
             outputmode = "ascii"
         kwargs["outputMode"] = outputmode
         kwargs["file_2"] = (
-            "temp_particles_input.txt" if not self.parallel else "temp_particles_input.bin"
+            f"{self._ROOTNAME}_particles_input.txt" if not self.parallel else f"{self._ROOTNAME}_particles_input.bin"
         )
 
         # load the pre-defined  convert plain data to sdds command
@@ -856,7 +857,7 @@ class ElegantRun:
         assert mode.lower() in ["row", "table"]
 
         # generate the sdds input file
-        sdds = SDDS(self.sif, "temp.sdds", 0)
+        sdds = SDDS(self.sif, f"{self._ROOTNAME}.sdds", 0)
         sdds.generate_scan_dataset(varydict)
 
         self.commandfile.clear()
@@ -882,7 +883,7 @@ class ElegantRun:
                     item=varyitemlist[i],
                     index_number=i,
                     index_limit=len(v),
-                    enumeration_file="temp.sdds",
+                    enumeration_file=f"{self._ROOTNAME}.sdds",
                     enumeration_column=k,
                 )
         else:
@@ -893,7 +894,7 @@ class ElegantRun:
                     item=varyitemlist[i],
                     index_number=0,
                     index_limit=len(v),
-                    enumeration_file="temp.sdds",
+                    enumeration_file=f"{self._ROOTNAME}.sdds",
                     enumeration_column=k,
                 )
         self.commandfile.addCommand("bunched_beam")
@@ -929,7 +930,7 @@ class ElegantRun:
             centroid="%s.cen",
             default_order=kwargs.get("default_order", 2),
             concat_order=kwargs.get("concat_order", 3),
-            rootname="temp",
+            rootname=self._ROOTNAME,
             parameters="%s.params",
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile
