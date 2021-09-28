@@ -155,7 +155,10 @@ class SDDSCommand:
             name = self.command.pop("NAME")
             commandstring = self.getCommand(name, **self.command)
         print("Running command {}".format(commandstring))
-        subp.run(commandstring, check=True, shell=True)
+        try:
+            subp.run(commandstring, check=True, shell=True, stdout=subp.PIPE, stderr=subp.STDOUT)
+        except subp.CalledProcessError as e:
+            print( e.output.decode() ) 
 
     def get_particles_plain_2_SDDS_command(self, **params) -> str:
         """

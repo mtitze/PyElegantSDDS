@@ -244,11 +244,10 @@ class ElegantRun:
         Check if all necessary info
         is given for Elegant to be able to run.
         """
-        if not all(req in self.kwargs.keys() for req in self._REQUIRED_KWARGS):
+        check = [req in self.kwargs.keys() for req in self._REQUIRED_KWARGS]
+        if not all(check):
             print("Missing required kwargs...")
-            print("Minimum required are:")
-            for r in self._REQUIRED_KWARGS:
-                print(r)
+            print( np.array(self._REQUIRED_KWARGS)[np.logical_not(check)] )
 
     def _write_parallel_script(self):
         """
@@ -290,8 +289,12 @@ class ElegantRun:
         # Debug: print(cmdstr)
 
         # run
-        with open(os.devnull, "w") as f:
-            subp.call(shlex.split(cmdstr), stdout=f)
+        with open(os.devnull, "w") as f:#
+            try:
+                subp.run(shlex.split(cmdstr), check=True, shell=True, stdout=f, stderr=subp.STDOUT)
+            except subp.CalledProcessError as e:
+                print( e.output.decode() ) 
+        #    subp.call(shlex.split(cmdstr), stdout=f)
 
     def add_basic_setup(self, **kwargs):
         """
