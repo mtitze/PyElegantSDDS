@@ -743,8 +743,6 @@ class ElegantRun:
         # load the pre-defined  convert plain data to sdds command
         cmd = sddscommand.get_particles_plain_2_SDDS_command(**kwargs)
 
-        import pdb; pdb.set_trace()
-
         # run the sdds command
         sddscommand.runCommand(cmd)
 
@@ -771,7 +769,7 @@ class ElegantRun:
         self.add_basic_setup()
 
         self.commandfile.addCommand("run_control", n_passes=kwargs.get("n_passes", 2 ** 8))
-        self.commandfile.addCommand("bunched_beam")
+        #self.commandfile.addCommand("bunched_beam")
         self.commandfile.addCommand(
             "sdds_beam",
             input=self.sdds_beam_file,
