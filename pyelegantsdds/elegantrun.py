@@ -230,14 +230,21 @@ class ElegantRun:
         self.parallel = parallel
         self.kwargs = kwargs
         self.check()
-        self.commandfile = ElegantCommandFile(f"{self._ROOTNAME}.ele")
+        self._init_commandfile(rootname=self._ROOTNAME)
 
         # setting up executable
         if parallel:
             self._write_parallel_script()
             self.exec = "bash {}".format(self.pelegant)
         else:
-            self.exec = "{} elegant ".format(self.sif)
+            self.exec = "{} elegant ".format(self.sif)            
+            
+    def _init_commandfile(self, rootname):
+        """
+        This function initializes the commandfile and can be used to change the rootname conveniently.
+        """
+        self._ROOTNAME = rootname
+        self.commandfile = ElegantCommandFile(f"{rootname}.ele")
 
     def check(self):
         """
@@ -287,10 +294,12 @@ class ElegantRun:
         # Debug: print(self.exec)
         cmdstr = "{} {}.ele".format(self.exec, self._ROOTNAME)
         # Debug: print(cmdstr)
-
+        
         # run
-        with open(os.devnull, "w") as f:
-            subp.call(shlex.split(cmdstr), stdout=f)
+        try:
+            subp.run(shlex.split(cmdstr), check=True, shell=False, stdout=subp.PIPE, stderr=subp.STDOUT)
+        except subp.CalledProcessError as e:
+            print( e.output.decode() )
 
     def add_basic_setup(self, **kwargs):
         """
@@ -728,7 +737,7 @@ class ElegantRun:
         kwargs.pop("pcentralmev", None)
 
         # Create sddscommand object
-        sddscommand = SDDSCommand(self.sif)
+        sddscommand = SDDSCommand(self.sif, rootname=self._ROOTNAME)
 
         # update the command parameters
         if self.parallel:
@@ -767,6 +776,7 @@ class ElegantRun:
         # construct command file
         self.commandfile.clear()
         self.add_basic_setup()
+        self.add_watch_at_start()
 
         self.commandfile.addCommand("run_control", n_passes=kwargs.get("n_passes", 2 ** 8))
         #self.commandfile.addCommand("bunched_beam")

@@ -48,8 +48,9 @@ class SDDSCommand:
         "sddsresdiag",
     ]
 
-    def __init__(self, sif):
+    def __init__(self, sif, rootname: str = "temp"):
         self.sif = sif
+        self._ROOTNAME = rootname
         self.command = {}
 
     def createCommand(self, command: str, note: str = "", **params) -> None:
@@ -169,8 +170,8 @@ class SDDSCommand:
         """
         return self.getCommand(
             "plaindata2sdds",
-            file_1=params.get("file_1", "temp_plain_particles.dat"),
-            file_2=params.get("file_2", "temp_particles_input.txt"),
+            file_1=params.get("file_1", f"{self._ROOTNAME}_plain_particles.dat"),
+            file_2=params.get("file_2", f"{self._ROOTNAME}_particles_input.txt"),
             inputMode=params.get("inputMode", "ascii"),
             outputMode=params.get("outputMode", "ascii"),
             separator=" ",
@@ -195,11 +196,12 @@ class SDDS:
     Class for interacting with SDDS files.
     """
 
-    def __init__(self, sif: str, filename: str, filetype: int):
+    def __init__(self, sif: str, filename: str, filetype: int, rootname: str = "temp"):
         assert filetype in [0, 1]
         self.sif = sif
         self._filetype = filetype
         self._filename = filename
+        self._ROOTNAME = rootname
         self.columnlist = None
         self.parameterlist = None
         self.commandlist = []
@@ -713,7 +715,7 @@ class SDDS:
 
     def generate_scan_dataset(self, datasetdict):
         """
-		Generates a file called "temp_scan.sdds" containing columns of values
+		Generates a file called f"{self._ROOTNAME}_scan.sdds" containing columns of values
 		to be used by elegant to scan over using vary_element method.
 
 		Arguments:
@@ -739,7 +741,7 @@ class SDDS:
 			"S3T": [0.000000,0.0000000000],\
 			"S4T": [0.000000,0.0000000000]
 		}
-		>>> sdds = SDDS(sif, "temp.sdds",0)
+		>>> sdds = SDDS(sif, f"{self._ROOTNAME}.sdds",0)
 		>>> sdds.generate_scan_dataset(datasetdc)
 
 		"""
@@ -749,4 +751,4 @@ class SDDS:
             cmd += f"-column={k},type=double -data=" + ",".join([str(vv) for vv in v]) + " "
 
         subp.run(cmd, check=True, shell=True)
-        self.sdds_scan = "temp.sdds"
+        self.sdds_scan = f"{self._ROOTNAME}.sdds"
