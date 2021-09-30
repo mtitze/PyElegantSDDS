@@ -231,7 +231,6 @@ class SDDS:
         Parameters
         ----------
         command : str
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        valid sdds command
         """
         sddscommand = SDDSCommand(self.sif)
         cmdstr = sddscommand.getCommand(command, **params)
