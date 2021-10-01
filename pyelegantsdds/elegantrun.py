@@ -34,25 +34,21 @@ def write_parallel_elegant_script():
     pelegant from bash.
     """
 
-    # list of strings to write
-    bashstrlist = [
-        "#!/usr/bin/env bash",
-        "if [ $# == 0 ] ; then",
-        '   echo "usage: run_Pelegant <inputfile>"',
-        "   exit 1",
-        "fi",
-        "n_cores=`grep processor /proc/cpuinfo | wc -l`",
-        "echo The system has $n_cores cores.",
-        "n_proc=$((n_cores-1))",
-        "echo $n_proc processes will be started.",
-        "if [ ! -e ~/.mpd.conf ]; then",
-        '  echo "MPD_SECRETWORD=secretword" > ~/.mpd.conf',
-        "  chmod 600 ~/.mpd.conf",
-        "fi",
-        "mpiexec -host $HOSTNAME -n $n_proc Pelegant  $1 $2 $3 $4 $5 $6 $7 $8 $9",
-    ]
-
-    bashstr = "\n".join(bashstrlist)
+    bashstr = '''#!/usr/bin/env bash
+if [ $# == 0 ] ; then
+    echo "usage: run_Pelegant <inputfile>"
+    exit 1
+fi
+n_cores=`grep processor /proc/cpuinfo | wc -l`
+echo The system has $n_cores cores.
+n_proc=$((n_cores-1))
+echo $n_proc processes will be started.
+if [ ! -e ~/.mpd.conf ]; then
+    echo "MPD_SECRETWORD=secretword" > ~/.mpd.conf
+    chmod 600 ~/.mpd.conf
+fi
+mpiexec -host $HOSTNAME -n $n_proc Pelegant  $1 $2 $3 $4 $5 $6 $7 $8 $9
+'''
 
     # write to file
     with open("temp_run_pelegant.sh", "w") as f:
@@ -66,18 +62,15 @@ def write_parallel_run_script(sif):
 
     Parameters:
     -----------
-    sif: str
-                                                                                                                                                                                                                                                                    path to singularity container
-
+    sif: str path to singularity container
     """
-    bashstrlist = [
-        "#!/bin/bash",
-        "pele={}".format(sif),
-        'cmd="bash temp_run_pelegant.sh"',
-        "",
-        "$pele $cmd $1",
-    ]
-    bashstr = "\n".join(bashstrlist)
+    
+    bashstr = f'''#!/bin/bash
+pele={sif}
+cmd="bash temp_run_pelegant.sh"
+        
+$pele $cmd $1
+'''
 
     # write to file
     with open("run_pelegant.sh", "w") as f:
@@ -99,19 +92,14 @@ def GenerateNDimCoordinateGrid(N, NPOINTS, pmin=1e-6, pmax=1e-4, man_ranges=None
 
     Parameters:
     -----------
-    N: int
-                                                                                                                                    dimension of the coordinate grid
-    NPOINTS: int
-                                                                                                                                    number of points in each dimension
-    pmin: float
-                                                                                                                                    min coordinate value in each dim
-    pmax: float
-                                                                                                                                    max coordinate value in each dim
+    N: int dimension of the coordinate grid
+    NPOINTS: int number of points in each dimension
+    pmin: float min coordinate value in each dim
+    pmax: float max coordinate value in each dim
 
     Returns:
     ========
-    coordinate_grid : numpy array
-                                                                                                                                    coordinate grid with particle ID in last column
+    coordinate_grid : numpy array coordinate grid with particle ID in last column
     """
     rangelist = [np.linspace(pmin, pmax, NPOINTS)] * N
     if man_ranges is not None:
@@ -139,16 +127,11 @@ def generate_sphere_grid(dim=2, rmin=1e-6, rmax=1, rsteps=3, phisteps=3, **kwarg
 
     Parameters
     ----------
-    dim : int, optional
-                                                                                                                                    dimension of the ball, by default 2
-    rmin : float, optional
-                                                                                                                                    minimal radius to use, by default 1e-6
-    rmax : float, optional
-                                                                                                                                    maximal radius to use, by default 1
-    rsteps : int, optional
-                                                                                                                                    number of steps in radius grid, by default 3
-    phisteps : int, optional
-                                                                                                                                    number of steps in the angle grid, by default 3
+    dim : int, optional dimension of the ball, by default 2
+    rmin : float, optional minimal radius to use, by default 1e-6
+    rmax : float, optional maximal radius to use, by default 1
+    rsteps : int, optional number of steps in radius grid, by default 3
+    phisteps : int, optional number of steps in the angle grid, by default 3
     """
     R = np.linspace(rmin, rmax, rsteps)
     mangle = np.pi
@@ -222,15 +205,14 @@ class ElegantRun:
     """
 
     _REQUIRED_KWARGS = ["use_beamline", "energy"]
-    _ROOTNAME = 'temp'
 
-    def __init__(self, sif, lattice: str, parallel=False, **kwargs):
+    def __init__(self, sif, lattice: str, parallel=False, rootname='temp', **kwargs):
         self.sif = sif
         self.lattice = lattice
         self.parallel = parallel
         self.kwargs = kwargs
         self.check()
-        self._init_commandfile(rootname=self._ROOTNAME)
+        self._init_commandfile(rootname=rootname)
 
         # setting up executable
         if parallel:
@@ -289,11 +271,12 @@ class ElegantRun:
 
         # write Elegant command file to disk
         self.commandfile.write()
+        self.commandfile.clear()
 
         # generate command string
         # Debug: print(self.exec)
         cmdstr = "{} {}.ele".format(self.exec, self._ROOTNAME)
-        # Debug: print(cmdstr)
+        print (f'Running command {cmdstr}')
         
         # run
         try:
@@ -301,20 +284,25 @@ class ElegantRun:
         except subp.CalledProcessError as e:
             print( e.output.decode() )
 
-    def add_basic_setup(self, **kwargs):
+
+    def add_basic_setup(self, energy: float, **kwargs):
         """
         Add basic setup command.
         """
-        self.commandfile.clear()
+        #self.commandfile.clear()
         self.commandfile.addCommand(
             "run_setup",
             lattice=self.lattice,
             use_beamline=self.kwargs.get("use_beamline", None),
-            p_central_mev=self.kwargs.get("energy", 1700.00),
+            p_central_mev=energy,
             # centroid="%s.cen",
             default_order=kwargs.get("default_order", 2),
             concat_order=kwargs.get("concat_order", 1),
             rootname=self._ROOTNAME,
+            losses="%s.lost",
+            losses_include_global_coordinates=kwargs.get("losses_include_global_coordinates", 0),           
+            #losses_s_limit=f'{kwargs.get("losses_s_limit_1", -9999)} {kwargs.get("losses_s_limit_2", 9999)}',
+            acceptance="%s.acc",
             parameters="%s.params",
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile
@@ -369,7 +357,7 @@ class ElegantRun:
         self.commandfile.addCommand("track")
 
     def add_watch(self, **kwargs):
-        """Add watch point."""
+        """Add watch point. Must follow basic_setup"""
         self.commandfile.addCommand(
             "insert_elements",
             name=kwargs.get("name", ""),
@@ -398,21 +386,40 @@ class ElegantRun:
         )
 
     def add_alter_elements(self, **kwargs):
-        """Add alter_element command."""
+        """Add alter_element command. Must follow basic_setup."""
         self.commandfile.addCommand("alter_elements", **kwargs)
+        
+    def add_rf(self, **kwargs):
+        """Add generic rf cavity (at lattice start by default). Must follow basic_setup"""
+        # under construction!
+        self.commandfile.addCommand(
+            "insert_elements",
+            name=kwargs.get("name", "RF"),
+            type=kwargs.get("type", "RFCA"),
+            exclude="",
+            s_start=kwargs.get("s_start", -1),
+            s_end=kwargs.get("s_end", -1),
+            skip=kwargs.get("skip", 1),
+            insert_before=kwargs.get("insert_before", 0),
+            add_at_end=kwargs.get("add_at_end", 0),
+            add_at_start=kwargs.get("add_at_start", 1),
+            element_def=kwargs.get(
+                "element_def",
+                r'"RF: RFCA, "')
+                ),
+            ),
+        )        
 
     def add_rf_setup(self, **kwargs):
         """Add rf_setup command."""
         self.commandfile.addCommand(
             "rf_setup",
             filename="%s.rf",
-            harmonic=kwargs.get("harmonic", 400),
-            total_voltage=kwargs.get("total_voltage", 1.5e6),
+            harmonic=kwargs.get("harmonic"),
+            total_voltage=kwargs.get("total_voltage"),
         )
 
-    def add_rf_get_freq_and_phase(
-        self, total_voltage: float = 4 * 375e3, harmonic: int = 400, rad: bool = False, **kwargs
-    ):
+    def add_rf_get_freq_and_phase(self, energy: float = 1700.00, total_voltage: float = 4 * 375e3, harmonic: int = 400, rad: bool = False, **kwargs):
         """Add simulation single turn to get synchronuous freq and phase to be used in next simulation.
         Produces temp.twi and temp.out that can be used with tags.
         Parameters
@@ -429,7 +436,7 @@ class ElegantRun:
             "run_setup",
             lattice=self.lattice,
             use_beamline=self.kwargs.pop("use_beamline", None),
-            p_central_mev=self.kwargs.pop("energy", 1700.00),
+            p_central_mev=energy,
             # centroid="%s.cen",
             default_order=kwargs.pop("default_order", 1),
             concat_order=kwargs.pop("concat_order", 1),
@@ -524,8 +531,7 @@ class ElegantRun:
 
         Parameters:
         ----------
-        kwargs  : dict
-                                                                                                                                        twiss command options
+        kwargs  : dict twiss command options
         """
         # TODO: add matched = 0 case
         matched = kwargs.get("matched", 1)
@@ -553,6 +559,7 @@ class ElegantRun:
 
         # write command file
         self.commandfile.write()
+        self.commandfile.clear()
 
         # set cmdstr and run
         cmdstr = "{} elegant {}.ele".format(self.sif, self._ROOTNAME)
@@ -577,18 +584,14 @@ class ElegantRun:
         Parameters:
         -----------
         kwargs  :
-                                                                                                                                        - SDDS_output_order : order of maps (max is 3)
+          - SDDS_output_order : order of maps (max is 3)
 
         Returns:
         --------
-        C       : np.array
-                                                                                                                                        constant vector
-        R       : np.array
-                                                                                                                                        R matrix
-        T_dict  : dict
-                                                                                                                                        T map Tijk as key
-        Q_dict  : dict
-                                                                                                                                        U map Qijkl as key
+        C       : np.array constant vector
+        R       : np.array R matrix
+        T_dict  : dict T map Tijk as key
+        Q_dict  : dict U map Qijkl as key
         """
         assert kwargs.get("SDDS_output_order", 1) < 4
 
@@ -610,6 +613,7 @@ class ElegantRun:
 
         # write command file
         self.commandfile.write()
+        self.commandfile.clear()
 
         # set cmdstr
         cmdstr = "{} elegant {}.ele".format(self.sif, self._ROOTNAME)
@@ -662,18 +666,16 @@ class ElegantRun:
         Parameters:
         ----------
         kwargs      :
-                                        - pmin: min value of grid on each dim
-                                        - pmax: max value of grid on each dim
-                                        - pcentralmev: particle energy (code converts it to beta * gamma )
-                                        - man_ranges: dict containing as key dim num - in order x xp y yp s p
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        and as values an array of values to be used
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        For p this is autoset to beta gamma based on pcentralmev
-                                        - NPOINTS: number of linear spaced points in each dim for the grid
+        - pmin: min value of grid on each dim
+        - pmax: max value of grid on each dim
+        - pcentralmev: particle energy (code converts it to beta * gamma )
+        - man_ranges: dict containing as key dim num - in order x xp y yp s p and as values an array of values to be used. 
+          For p this is autoset to beta gamma based on pcentralmev
+        - NPOINTS: number of linear spaced points in each dim for the grid
 
         Returns:
         --------
         None, writes the data to pre-defined named file.
-
         """
         assert grid_type in ["rectangular", "spherical"]
         pcentral = kwargs.get("pcentralmev", self.kwargs.get("energy"))
@@ -766,7 +768,6 @@ class ElegantRun:
         Be careful with giving the 6th coordinate, this is beta * gamma. If not
         given it will be calculated automatically either using standard 1700 MeV
         or kwargs["pcentralmev"].
-
         """
         # generate particle input file
         self.generate_sdds_particle_inputfile(
@@ -775,7 +776,7 @@ class ElegantRun:
 
         # construct command file
         self.commandfile.clear()
-        self.add_basic_setup()
+        self.add_basic_setup(**kwargs)
         self.add_watch_at_start()
 
         self.commandfile.addCommand("run_control", n_passes=kwargs.get("n_passes", 2 ** 8))
