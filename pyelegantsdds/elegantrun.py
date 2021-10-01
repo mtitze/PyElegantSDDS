@@ -28,15 +28,15 @@ from .sdds import SDDS, SDDSCommand
 # ==============================================================================
 
 
-def write_parallel_elegant_script():
+def write_parallel_elegant_script(rootname='temp'):
     """
     Method to generate a script that runs
     pelegant from bash.
     """
 
-    bashstr = '''#!/usr/bin/env bash
+    bashstr = f'''#!/usr/bin/env bash
 if [ $# == 0 ] ; then
-    echo "usage: run_Pelegant <inputfile>"
+    echo "usage: {rootname}_sif_pelegant <inputfile>"
     exit 1
 fi
 n_cores=`grep processor /proc/cpuinfo | wc -l`
@@ -51,11 +51,11 @@ mpiexec -host $HOSTNAME -n $n_proc Pelegant  $1 $2 $3 $4 $5 $6 $7 $8 $9
 '''
 
     # write to file
-    with open("temp_run_pelegant.sh", "w") as f:
+    with open(f"{rootname}_sif_pelegant.sh", "w") as f:
         f.write(bashstr)
 
 
-def write_parallel_run_script(sif):
+def write_parallel_run_script(sif, rootname='temp'):
     """
     Method to generate parallel elegant run
     script.
@@ -67,13 +67,13 @@ def write_parallel_run_script(sif):
     
     bashstr = f'''#!/bin/bash
 pele={sif}
-cmd="bash temp_run_pelegant.sh"
+cmd="bash {rootname}_sif_pelegant.sh"
         
 $pele $cmd $1
 '''
 
     # write to file
-    with open("run_pelegant.sh", "w") as f:
+    with open(f"{rootname}_run_pelegant.sh", "w") as f:
         f.write(bashstr)
 
 
@@ -240,12 +240,11 @@ class ElegantRun:
 
     def _write_parallel_script(self):
         """
-        Generate the script to run parallel elegant.
         Method sets self.pelegant to the script file.
         """
-        write_parallel_elegant_script()
-        write_parallel_run_script(self.sif)
-        self.pelegant = "run_pelegant.sh"
+        write_parallel_elegant_script(rootname=self._ROOTNAME)
+        write_parallel_run_script(self.sif, rootname=self._ROOTNAME)
+        self.pelegant = f"{self._ROOTNAME}_run_pelegant.sh"
 
     def clearCommands(self):
         """Clear the command list."""
@@ -389,7 +388,8 @@ class ElegantRun:
         """Add alter_element command. Must follow basic_setup."""
         self.commandfile.addCommand("alter_elements", **kwargs)
         
-    def add_rf(self, **kwargs):
+        '''    
+        def add_rf(self, **kwargs):
         """Add generic rf cavity (at lattice start by default). Must follow basic_setup"""
         # under construction!
         self.commandfile.addCommand(
@@ -408,7 +408,8 @@ class ElegantRun:
                 r'"RF: RFCA, "')
                 ),
             ),
-        )        
+        )     
+        '''   
 
     def add_rf_setup(self, **kwargs):
         """Add rf_setup command."""
