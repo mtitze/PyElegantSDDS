@@ -278,10 +278,30 @@ class ElegantRun:
         print (f'Running command {cmdstr}')
         
         # run
+        errors, output = None, None
         try:
-            subp.run(shlex.split(cmdstr), check=True, shell=False, stdout=subp.PIPE, stderr=subp.STDOUT)
+            task = subp.run(shlex.split(cmdstr), check=True, shell=False, stdout=subp.PIPE,
+                               stderr=subp.STDOUT)
+            errors = task.stderr
+            output = task.stdout
         except subp.CalledProcessError as e:
-            print( e.output.decode() )
+            print ('>>> AN ERROR HAS OCCURED! <<<')
+            print (f'Check {self._ROOTNAME}.stderr')
+            errors = e.output
+            
+        if output == None:
+            output = ''
+        else:
+            output = output.decode('utf-8')
+        with open(f'{self._ROOTNAME}.stdout', 'w') as f:
+            f.write(output)
+                   
+        if errors == None:
+            errors = ''
+        else:
+            errors = errors.decode('utf-8')
+        with open(f'{self._ROOTNAME}.stderr', 'w') as f:
+            f.write(errors)
 
 
     def add_basic_setup(self, energy: float, **kwargs):
@@ -306,6 +326,7 @@ class ElegantRun:
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile
             final="%s.fin",
+            output="%s.out",
         )
 
     def add_basic_twiss(self):
@@ -411,13 +432,13 @@ class ElegantRun:
         )     
         '''   
 
-    def add_rf_setup(self, **kwargs):
-        """Add rf_setup command."""
+    def add_rf_setup(self, harmonic, total_voltage, **kwargs):
+        """Add rf_setup command. Must follow a twiss_output command."""
         self.commandfile.addCommand(
             "rf_setup",
             filename="%s.rf",
-            harmonic=kwargs.get("harmonic"),
-            total_voltage=kwargs.get("total_voltage"),
+            harmonic=harmonic,
+            total_voltage=total_voltage,
         )
 
     def add_rf_get_freq_and_phase(self, energy: float = 1700.00, total_voltage: float = 4 * 375e3, harmonic: int = 400, rad: bool = False, **kwargs):
