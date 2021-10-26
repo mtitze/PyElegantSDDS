@@ -206,7 +206,7 @@ class ElegantRun:
 
     _REQUIRED_KWARGS = ["use_beamline", "energy"]
 
-    def __init__(self, sif, lattice: str, parallel=False, rootname='temp', **kwargs):
+    def __init__(self, sif, lattice: str, parallel=False, rootname='run', **kwargs):
         self.sif = sif
         self.lattice = lattice
         self.parallel = parallel
@@ -349,6 +349,8 @@ class ElegantRun:
             final=kwargs.get("final", 0.0000),
             index_number=kwargs.get("index_number", 0),
             index_limit=kwargs.get("index_limit", 1),
+            start_occurence=kwargs.get('start_occurence', -1),
+            end_occurence=kwargs.get('end_occurence', -1)
         )
 
     def add_vary_element_from_file(self, **kwargs):
@@ -432,13 +434,16 @@ class ElegantRun:
         )     
         '''   
 
-    def add_rf_setup(self, harmonic, total_voltage, **kwargs):
+    def add_rf_setup(self, **kwargs):
         """Add rf_setup command. Must follow a twiss_output command."""
+        
         self.commandfile.addCommand(
             "rf_setup",
-            filename="%s.rf",
-            harmonic=harmonic,
-            total_voltage=total_voltage,
+            filename="%s.rf", 
+            harmonic=kwargs.get('harmonic', 0),
+            total_voltage=kwargs.get('total_voltage', 0),
+            near_frequency=kwargs.get('near_frequency', 0),
+            track_for_frequency=kwargs.get('track_for_frequency', 0)     
         )
 
     def add_rf_get_freq_and_phase(self, energy: float = 1700.00, total_voltage: float = 4 * 375e3, harmonic: int = 400, rad: bool = False, **kwargs):
@@ -703,10 +708,7 @@ class ElegantRun:
         pcentral = kwargs.get("pcentralmev", self.kwargs.get("energy"))
         print(pcentral)
         # convert to beta * gamma
-        pcentral = np.sqrt(
-            (pcentral / const.physical_constants["electron mass energy equivalent in MeV"][0]) ** 2
-            - 1
-        )
+        pcentral = np.sqrt((pcentral/const.physical_constants["electron mass energy equivalent in MeV"][0])**2  - 1)
 
         if grid_type == "rectangular":
             npoints_per_dim = kwargs.get("NPOINTS", 2)
