@@ -90,6 +90,19 @@ class ElegantCommandFile:
 
         """
         return typename.lower() in self._COMMANDLIST
+    
+    def exists(self, command):
+        '''
+        Check if a command is present in the current command list.
+        
+        Parameters
+        ----------
+        command: str
+            Name of the command.
+        '''
+        cmd = command.lower()
+        if not cmd in [cmd['NAME'] for cmd in self.commandlist]:
+            raise RuntimeError(f'Command {cmd} required.')
 
     def addCommand(self, command, note="", **params):
         """
