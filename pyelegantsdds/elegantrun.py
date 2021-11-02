@@ -141,9 +141,7 @@ def generate_sphere_grid(dim=2, rmin=1e-6, rmax=1, rsteps=3, phisteps=3, **kwarg
         mangle = mangle / 2.0
 
     PHI1 = np.linspace(0, mangle, phisteps)
-    PHI2 = np.linspace(
-        0, mangle, phisteps
-    )  # full sphere is 2 pi reduced for tracking to upper half
+    PHI2 = np.linspace(0, mangle, phisteps)  # full sphere is 2 pi reduced for tracking to upper half
 
     # the special case
     if dim != 6:
@@ -204,16 +202,17 @@ class ElegantRun:
     Class to interact with Elegant and Parallel Elegant from Python.
     """
 
-    _REQUIRED_KWARGS = ["use_beamline", "energy"]
-
-    def __init__(self, sif, lattice: str, parallel=False, rootname='run', **kwargs):
+    def __init__(self, sif, lattice: str, energy_gev: float, beamline: str, parallel=False, rootname='run', **kwargs):
         self.sif = sif
         self.lattice = lattice
+        self.energy_gev = energy_gev
+        self.beamline = beamline
         self.parallel = parallel
         self.kwargs = kwargs
-        self.check()
-        self._init_commandfile(rootname=rootname)
-
+        
+        self.set_rootname(rootname)
+        self.commandfile = ElegantCommandFile(self.commandfile_name)
+        
         # setting up executable
         if parallel:
             self._write_parallel_script()
@@ -221,30 +220,20 @@ class ElegantRun:
         else:
             self.exec = "{} elegant ".format(self.sif)            
             
-    def _init_commandfile(self, rootname):
+    def set_rootname(self, rootname):
         """
         This function initializes the commandfile and can be used to change the rootname conveniently.
         """
-        self._ROOTNAME = rootname
-        self.commandfile = ElegantCommandFile(f"{rootname}.ele")
-
-    def check(self):
-        """
-        Check if all necessary info
-        is given for Elegant to be able to run.
-        """
-        check = [req in self.kwargs.keys() for req in self._REQUIRED_KWARGS]
-        if not all(check):
-            print("Missing required kwargs...")
-            print( np.array(self._REQUIRED_KWARGS)[np.logical_not(check)] )
+        self.rootname = rootname
+        self.commandfile_name = f"{rootname}.ele"
 
     def _write_parallel_script(self):
         """
         Method sets self.pelegant to the script file.
         """
-        write_parallel_elegant_script(rootname=self._ROOTNAME)
-        write_parallel_run_script(self.sif, rootname=self._ROOTNAME)
-        self.pelegant = f"{self._ROOTNAME}_run_pelegant.sh"
+        write_parallel_elegant_script(rootname=self.rootname)
+        write_parallel_run_script(self.sif, rootname=self.rootname)
+        self.pelegant = f"{self.rootname}_run_pelegant.sh"
 
     def clearCommands(self):
         """Clear the command list."""
@@ -274,7 +263,7 @@ class ElegantRun:
 
         # generate command string
         # Debug: print(self.exec)
-        cmdstr = "{} {}.ele".format(self.exec, self._ROOTNAME)
+        cmdstr = "{} {}.ele".format(self.exec, self.rootname)
         print (f'Running command {cmdstr}')
         
         # run
@@ -286,38 +275,36 @@ class ElegantRun:
             output = task.stdout
         except subp.CalledProcessError as e:
             print ('>>> AN ERROR HAS OCCURED! <<<')
-            print (f'Check {self._ROOTNAME}.stderr')
+            print (f'Check {self.rootname}.stderr')
             errors = e.output
             
         if output == None:
             output = ''
         else:
             output = output.decode('utf-8')
-        with open(f'{self._ROOTNAME}.stdout', 'w') as f:
+        with open(f'{self.rootname}.stdout', 'w') as f:
             f.write(output)
                    
         if errors == None:
             errors = ''
         else:
             errors = errors.decode('utf-8')
-        with open(f'{self._ROOTNAME}.stderr', 'w') as f:
+        with open(f'{self.rootname}.stderr', 'w') as f:
             f.write(errors)
-
-
-    def add_basic_setup(self, energy: float, **kwargs):
+            
+    def add_basic_setup(self, **kwargs):
         """
         Add basic setup command.
         """
-        #self.commandfile.clear()
         self.commandfile.addCommand(
             "run_setup",
             lattice=self.lattice,
-            use_beamline=self.kwargs.get("use_beamline", None),
-            p_central_mev=energy,
+            use_beamline=self.beamline,
+            p_central_mev=self.energy_gev*1e3,
             # centroid="%s.cen",
             default_order=kwargs.get("default_order", 2),
-            concat_order=kwargs.get("concat_order", 1),
-            rootname=self._ROOTNAME,
+            concat_order=kwargs.get("concat_order", 0),
+            rootname=self.rootname,
             losses="%s.lost",
             losses_include_global_coordinates=kwargs.get("losses_include_global_coordinates", 0),           
             #losses_s_limit=f'{kwargs.get("losses_s_limit_1", -9999)} {kwargs.get("losses_s_limit_2", 9999)}',
@@ -337,6 +324,16 @@ class ElegantRun:
             "twiss_output", filename="%s.twi", matched=1, radiation_integrals=1
         )
 
+    def add_closed_orbit(self, **kwargs):
+        '''
+        Add closed_orbit command.
+        '''
+        self.commandfile.addCommand(
+            "closed_orbit",
+            output=kwargs.get('output', '%s.clo'),
+            tracking_turns=kwargs.get('tracking_turns', 256)
+        )
+        
     def add_vary_element(self, **kwargs):
         """
         Add single vary element line.
@@ -359,7 +356,7 @@ class ElegantRun:
         dataset file.
         """
         if "enumeration_file" not in kwargs.keys():
-            print("External filename missing.")
+            raise RuntimeError("External filename missing.")
         else:
             self.commandfile.addCommand(
                 "vary_element",
@@ -411,10 +408,9 @@ class ElegantRun:
         """Add alter_element command. Must follow basic_setup."""
         self.commandfile.addCommand("alter_elements", **kwargs)
         
-        '''    
-        def add_rf(self, **kwargs):
+  
+    def add_rf(self, length, voltage, frequency, phase, **kwargs):
         """Add generic rf cavity (at lattice start by default). Must follow basic_setup"""
-        # under construction!
         self.commandfile.addCommand(
             "insert_elements",
             name=kwargs.get("name", "RF"),
@@ -426,14 +422,10 @@ class ElegantRun:
             insert_before=kwargs.get("insert_before", 0),
             add_at_end=kwargs.get("add_at_end", 0),
             add_at_start=kwargs.get("add_at_start", 1),
-            element_def=kwargs.get(
-                "element_def",
-                r'"RF: RFCA, "')
-                ),
-            ),
-        )     
-        '''   
-
+            #element_def=kwargs.get("element_def", r'"RF: RFCA, "')
+            element_def=f'"RF: RFCA, L={length}, VOLT={voltage}, FREQ={frequency}, PHASE={phase}"'
+            )
+             
     def add_rf_setup(self, **kwargs):
         """Add rf_setup command. Must follow a twiss_output command."""
         
@@ -446,7 +438,7 @@ class ElegantRun:
             track_for_frequency=kwargs.get('track_for_frequency', 0)     
         )
 
-    def add_rf_get_freq_and_phase(self, energy: float = 1700.00, total_voltage: float = 4 * 375e3, harmonic: int = 400, rad: bool = False, **kwargs):
+    def add_rf_get_freq_and_phase(self, total_voltage: float = 4 * 375e3, harmonic: int = 400, rad: bool = False, **kwargs):
         """Add simulation single turn to get synchronuous freq and phase to be used in next simulation.
         Produces temp.twi and temp.out that can be used with tags.
         Parameters
@@ -462,12 +454,12 @@ class ElegantRun:
         self.commandfile.addCommand(
             "run_setup",
             lattice=self.lattice,
-            use_beamline=self.kwargs.pop("use_beamline", None),
-            p_central_mev=energy,
+            use_beamline=self.beamline,
+            p_central_mev=self.energy_gev*1e3,
             # centroid="%s.cen",
             default_order=kwargs.pop("default_order", 1),
             concat_order=kwargs.pop("concat_order", 1),
-            rootname=self._ROOTNAME,
+            rootname=self.rootname,
             parameters="%s.params",
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile
@@ -484,23 +476,37 @@ class ElegantRun:
         self.add_basic_controls()
         self.run()
 
-    def add_radiation_damping(self):
-        """Add radiation damping for CSBEND, KQUAD and KSEXT."""
+    def add_radiation_damping(self, isr=1, **kwargs):
+        """Add radiation damping for CSBEND, KQUAD and KSEXT.
+        
+        isr: also set ISR (include incoherent synchrotron radiation) to the given value.
+        """
 
         self.add_alter_elements(name="*", type="CSBEND", item="SYNCH_RAD", value=1)
         self.add_alter_elements(name="*", type="CSBEND", item="USE_RAD_DIST", value=1)
+        self.add_alter_elements(name="*", type="CSBEND", item="ISR", value=isr)
         self.add_alter_elements(name="*", type="KQUAD", item="SYNCH_RAD", value=1)
-        self.add_alter_elements(name="*", type="KQUAD", item="ISR", value=1)
+        self.add_alter_elements(name="*", type="KQUAD", item="ISR", value=isr)
         self.add_alter_elements(name="*", type="KQUAD", item="ISR1PART", value=1)
         self.add_alter_elements(name="*", type="KSEXT", item="SYNCH_RAD", value=1)
-        self.add_alter_elements(name="*", type="KSEXT", item="ISR", value=1)
+        self.add_alter_elements(name="*", type="KSEXT", item="ISR", value=isr)
         self.add_alter_elements(name="*", type="KSEXT", item="ISR1PART", value=1)
 
     def use_standard_nkicks(self):
         self.add_alter_elements(name="*", type="CSBEND", item="N_KICKS", value=16)
         self.add_alter_elements(name="*", type="KQUAD", item="N_KICKS", value=8)
         self.add_alter_elements(name="*", type="KSEXT", item="N_KICKS", value=8)
-
+        
+        
+    def add_momentum_aperture(self, **kwargs):
+        self.commandfile.addCommand(
+            "momentum_aperture",
+            output=kwargs.get('output', '%s.mmap'),
+            x_initial=kwargs.get('x_initial', 0),
+            y_initial=kwargs.get('y_initial', 0),  # The initial x and y coordinate values for tracking. It is essential that y_initial be nonzero if one wants to see losses due to vertical resonances. 
+            fiducialize=kwargs.get('fiducialize', 0) # If given, an initially on-energy particle is tracked before the momentum aperture search begins, in order to fiducialize the reference momentum. This is useful if there are synchrotron radiation losses or energy gain due to cavities in the system. 
+        )
+        
     def add_fma_command(self, **kwargs):
         """
         Add elegant standard fma command.
@@ -589,12 +595,12 @@ class ElegantRun:
         self.commandfile.clear()
 
         # set cmdstr and run
-        cmdstr = "{} elegant {}.ele".format(self.sif, self._ROOTNAME)
+        cmdstr = "{} elegant {}.ele".format(self.sif, self.rootname)
         with open(os.devnull, "w") as f:
             subp.call(shlex.split(cmdstr), stdout=f)
 
         # load twiss output
-        twifile = SDDS(self.sif, "{}.twi".format(self._ROOTNAME), 0)
+        twifile = SDDS(self.sif, "{}.twi".format(self.rootname), 0)
         twiparams = twifile.getParameterValues()
         twidata = twifile.getColumnValues()
 
@@ -643,11 +649,11 @@ class ElegantRun:
         self.commandfile.clear()
 
         # set cmdstr
-        cmdstr = "{} elegant {}.ele".format(self.sif, self._ROOTNAME)
+        cmdstr = "{} elegant {}.ele".format(self.sif, self.rootname)
         with open(os.devnull, "w") as f:
             subp.call(shlex.split(cmdstr), stdout=f)
 
-        with open(f"{self._ROOTNAME}.mat", "r") as f:
+        with open(f"{self.rootname}.mat", "r") as f:
             mdata = f.read()
 
         # get full turn matrix and
@@ -679,7 +685,7 @@ class ElegantRun:
                 if not pd.isna(_value):
                     Q_dict[_key] = _value
 
-        sddsmat = SDDS(self.sif, f"{self._ROOTNAME}.sdds", 0)
+        sddsmat = SDDS(self.sif, f"{self.rootname}.sdds", 0)
         ElementMatrices = sddsmat.getColumnValues()
 
         return C, R, ElementMatrices, T_dict, Q_dict
@@ -705,8 +711,8 @@ class ElegantRun:
         None, writes the data to pre-defined named file.
         """
         assert grid_type in ["rectangular", "spherical"]
-        pcentral = kwargs.get("pcentralmev", self.kwargs.get("energy"))
-        print(pcentral)
+        pcentral = kwargs.get("pcentralmev", self.energy_gev*1e3)
+        print('pcentralmev: ', pcentral)
         # convert to beta * gamma
         pcentral = np.sqrt((pcentral/const.physical_constants["electron mass energy equivalent in MeV"][0])**2  - 1)
 
@@ -724,7 +730,7 @@ class ElegantRun:
 
             gridpoints = GenerateNDimCoordinateGrid(6, npoints_per_dim, pmin=pmin, pmax=pmax, man_ranges=man_ranges)
             particle_df = pd.DataFrame(gridpoints)
-            particle_df.to_csv(f"{self._ROOTNAME}_plain_particles.dat", sep=" ", header=None, index=False)
+            particle_df.to_csv(f"{self.rootname}_plain_particles.dat", sep=" ", header=None, index=False)
 
             # cleanup kwargs
             kwargs.pop("NPOINTS", None)
@@ -751,7 +757,7 @@ class ElegantRun:
                 )
             )
 
-            particle_df.to_csv(f"{self._ROOTNAME}_plain_particles.dat", sep=" ", header=None, index=False)
+            particle_df.to_csv(f"{self.rootname}_plain_particles.dat", sep=" ", header=None, index=False)
             # clean up kwargs
             kwargs.pop("rmin", None)
             kwargs.pop("rmax", None)
@@ -763,7 +769,7 @@ class ElegantRun:
         kwargs.pop("pcentralmev", None)
 
         # Create sddscommand object
-        sddscommand = SDDSCommand(self.sif, rootname=self._ROOTNAME)
+        sddscommand = SDDSCommand(self.sif, rootname=self.rootname)
 
         # update the command parameters
         if self.parallel:
@@ -772,7 +778,7 @@ class ElegantRun:
             outputmode = "ascii"
         kwargs["outputMode"] = outputmode
         kwargs["file_2"] = (
-            f"{self._ROOTNAME}_particles_input.txt" if not self.parallel else f"{self._ROOTNAME}_particles_input.bin"
+            f"{self.rootname}_particles_input.txt" if not self.parallel else f"{self.rootname}_particles_input.bin"
         )
 
         # load the pre-defined  convert plain data to sdds command
@@ -889,7 +895,7 @@ class ElegantRun:
         assert mode.lower() in ["row", "table"]
 
         # generate the sdds input file
-        sdds = SDDS(self.sif, f"{self._ROOTNAME}.sdds", 0)
+        sdds = SDDS(self.sif, f"{self.rootname}.sdds", 0)
         sdds.generate_scan_dataset(varydict)
 
         self.commandfile.clear()
@@ -915,7 +921,7 @@ class ElegantRun:
                     item=varyitemlist[i],
                     index_number=i,
                     index_limit=len(v),
-                    enumeration_file=f"{self._ROOTNAME}.sdds",
+                    enumeration_file=f"{self.rootname}.sdds",
                     enumeration_column=k,
                 )
         else:
@@ -926,7 +932,7 @@ class ElegantRun:
                     item=varyitemlist[i],
                     index_number=0,
                     index_limit=len(v),
-                    enumeration_file=f"{self._ROOTNAME}.sdds",
+                    enumeration_file=f"{self.rootname}.sdds",
                     enumeration_column=k,
                 )
         self.commandfile.addCommand("bunched_beam")
@@ -957,12 +963,12 @@ class ElegantRun:
         self.commandfile.addCommand(
             "run_setup",
             lattice=self.lattice,
-            use_beamline=self.kwargs.get("use_beamline", None),
-            p_central_mev=self.kwargs.get("energy", 1700.00),
+            use_beamline=self.beamline,
+            p_central_mev=self.energy_gev*1e3,
             centroid="%s.cen",
             default_order=kwargs.get("default_order", 2),
             concat_order=kwargs.get("concat_order", 3),
-            rootname=self._ROOTNAME,
+            rootname=self.rootname,
             parameters="%s.params",
             semaphore_file="%s.done",
             magnets="%s.mag",  # for plotting profile

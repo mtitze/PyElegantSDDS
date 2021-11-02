@@ -76,8 +76,7 @@ class ElegantCommandFile:
     def __init__(self, filename):
         self.commandlist = []
         self.filename = filename
-        self.history = {}
-        self._count_iter = count(start=0, step=1)
+        self.history = []
 
     def checkCommand(self, typename):
         """
@@ -90,16 +89,15 @@ class ElegantCommandFile:
                 command type
 
         """
-        for tn in self._COMMANDLIST:
-            if tn == typename.lower():
-                return True
-        return False
+        return typename.lower() in self._COMMANDLIST
 
     def addCommand(self, command, note="", **params):
         """
         Method to add a command to the command file.
         Generates a dict to reconstruct command string,
         that can be added to the command file.
+        
+        values of the form 'None' or '""' are ignored.
 
         Parameters:
         ----------
@@ -109,10 +107,11 @@ class ElegantCommandFile:
                 extra info
         """
         # check if it is a valid Elegant command
-        if self.checkCommand(command) == False:
-            print("The command {} is not recognized.".format(command))
-            return
+        if not self.checkCommand(command):
+            raise RuntimeError("Command '{}' not recognized.".format(command))
 
+        ignored_values = ["", None]
+        
         # init command dict
         thiscom = {}
 
@@ -121,8 +120,9 @@ class ElegantCommandFile:
 
         # add command parameters to the command dict
         for k, v in params.items():
-            if v != "":
-                thiscom[k] = v
+            if v in ignored_values:
+                continue
+            thiscom[k] = v
 
         # add the command dict to the command list
         self.commandlist.append(thiscom)
@@ -157,14 +157,11 @@ class ElegantCommandFile:
         # find command to updated given in mode
         # allowed are : first, last or integer
         if len(indlist) == 1:
-
             for k, v in params.items():
                 self.commandlist[indlist[0]][k] = v
             return
-
         elif len(indlist) == 0:
-            print("No such command {} can be found".format(commandname))
-
+            raise RuntimeError("Command '{}' not found".format(commandname))
         else:
             if mode == "last":
                 for k, v in params.items():
@@ -174,14 +171,12 @@ class ElegantCommandFile:
                 for k, v in params.items():
                     self.commandlist[indlist[0]][k] = v
                 return
-
             elif isinstance(mode, int):
                 for k, v in params.items():
                     self.commandlist[indlist[mode]][k] = v
                 return
-
             else:
-                print("The mode is invalid")
+                raise RuntimeError("The mode is invalid")
 
     def repeatCommand(self, commandname, mode="last"):
         """
@@ -208,10 +203,8 @@ class ElegantCommandFile:
         if len(indlist) == 1:
             self.commandlist.append(self.commandlist[indlist[0]])
             return
-
         elif len(indlist) == 0:
-            print("No such command {} can be found".format(commandname))
-
+            raise RuntimeError("Command '{}' not found".format(commandname))
         else:
             if mode == "last":
                 self.commandlist.append(self.commandlist[indlist[-1]])
@@ -220,16 +213,15 @@ class ElegantCommandFile:
             elif isinstance(mode, int):
                 self.commandlist.append(self.commandlist[indlist[mode]])
             else:
-                print("The mode is invalid")
+                raise RuntimeError("The mode is invalid")
 
     def clearHistory(self):
         """
         Clear command history.
         """
         self.history = {}
-        self._count_iter = count(start=0, step=1)
 
-    def _addHistory(self, cmdlist):
+    def addHistory(self, cmdlist=None):
         """
         Add commands to history.
 
@@ -238,17 +230,17 @@ class ElegantCommandFile:
         list | str : cmdlist
                 command or list of commands to add to history.
         """
-        _key = next(self._count_iter)
+        if cmdlist == None:
+            cmdlist = self.commandlist
         if not isinstance(cmdlist, list):
-            cmdlist = [cmdlist]
-        _value = cmdlist
-        self.history[_key] = _value
+            raise RuntimeError('commandlist not a list.')
+        self.history.append(cmdlist)
 
     def clear(self):
         """Clear command list."""
         # check if commadnlist empty if not add to history
         if len(self.commandlist) > 0:
-            self._addHistory(self.commandlist)
+            self.addHistory(self.commandlist)
 
         # clear commandlist
         self.commandlist = []
