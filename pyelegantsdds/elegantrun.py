@@ -262,7 +262,13 @@ class ElegantRun:
             output=kwargs.get('output', '%s.mmap'),
             x_initial=kwargs.get('x_initial', 0),
             y_initial=kwargs.get('y_initial', 0),  # The initial x and y coordinate values for tracking. It is essential that y_initial be nonzero if one wants to see losses due to vertical resonances. 
-            fiducialize=kwargs.get('fiducialize', 0) # If given, an initially on-energy particle is tracked before the momentum aperture search begins, in order to fiducialize the reference momentum. This is useful if there are synchrotron radiation losses or energy gain due to cavities in the system. 
+            fiducialize=kwargs.get('fiducialize', 0), # If given, an initially on-energy particle is tracked before the momentum aperture search begins, in order to fiducialize the reference momentum. This is useful if there are synchrotron radiation losses or energy gain due to cavities in the system. 
+            delta_negative_start = kwargs.get('delta_negative_start', 0.0),
+            delta_positive_start = kwargs.get('delta_positive_start', 0.0),
+            delta_negative_limit = kwargs.get('delta_negative_limit', -0.1),
+            delta_positive_limit = kwargs.get('delta_positive_limit', 0.1),
+            delta_step_size = kwargs.get('delta_step_size', 0.01),
+            output_mode = kwargs.get('output_mode', 0) # Normally, elegant puts the values for positive and negative momentum aperture in different columns. Each element thus has a single row of data in the output file. If output_mode=1, elegant instead puts the values for positive and negative apertures in successive rows, with a reduced number of columns. This is mostly advantageous for the parallel version, since it allows using twice as many simultaneous processors. If output_mode=2, elegant tracks many more probe particles simultaneously, which is better for massively parallel systems. The number of particles tracked is the number of elements selected times the number of probe points between delta_negative_limit and delta_positive_limit. 
         )
 
     def add_frequency_map(self, **kwargs):

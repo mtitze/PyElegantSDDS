@@ -46,6 +46,7 @@ class SDDSCommand:
         "sddsmakedataset",
         "sddsnaff",
         "sddsresdiag",
+        "sddssort",
     ]
 
     def __init__(self, sif, rootname: str = "temp"):
@@ -691,15 +692,7 @@ class SDDS:
         else:
             print("File missing.")
 
-    def sddsplot_fma(
-        self,
-        file=None,
-        col="x,y",
-        split="column=diffusionRate",
-        graph="sym,vary=subtype,fill,scale=2,fill",
-        order="spectral",
-        **kwargs,
-    ):
+    def sddsplot_fma(self, file=None, col="x,y", split="column=diffusionRate", graph="sym,vary=subtype,fill,scale=2,fill", order="spectral", **kwargs):
         newkwargs = {
             "file": file,
             "col": col,
@@ -751,3 +744,17 @@ class SDDS:
 
         subp.run(cmd, check=True, shell=True)
         self.sdds_scan = f"{self._ROOTNAME}.sdds"
+        
+    def sort(self):
+        # build command string
+        cmdstr = "{} sddssort -column={} {}".format(
+            self.sif,
+            's',
+            f'{self._ROOTNAME}.mmap',
+        )
+
+        # run command
+        p = subp.Popen(cmdstr, stdout=subp.PIPE, shell=True)
+        (output, err) = p.communicate()
+        p_status = p.wait()
+        
