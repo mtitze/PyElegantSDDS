@@ -1,5 +1,6 @@
 from .main import ElegantRunToolkit
 from .rf import rftools
+from ..tools.shell_process import call
 
 class dynap(ElegantRunToolkit):
         
@@ -63,6 +64,8 @@ class dynap(ElegantRunToolkit):
         """
         self.er.commandfile.clear()
         self.er.add_run_setup(**kwargs)
+        
+        self.er.add_twiss_output(radiation_integrals=1) # not required for momentum aperture calculation, but useful to record the twiss parameters to be used later for the Touschek lifetime.
     
         if rf != 0:
             rfc = rftools(self.er)
@@ -70,3 +73,21 @@ class dynap(ElegantRunToolkit):
             
         self.er.commandfile.addCommand("run_control", n_passes=n_passes)
         self.er.add_momentum_aperture(**kwargs)
+    
+    def touschekLifetime(self, outstr='tlife', **kwargs):
+        
+        # set cmdstr and run
+        cmdstr = f'{self.er.sif} touschekLifetime {self.er.rootname}.{outstr}'
+        
+        if 'twiss' not in kwargs.keys():
+            kwargs['twiss'] = f'{self.er.rootname}.twi'
+        if 'aper' not in kwargs.keys():
+            kwargs['aper'] = f'{self.er.rootname}.mmap'
+
+        for key in kwargs.keys():
+            cmdstr += f' -{key}={kwargs[key]}'
+            
+        print (f'Executing command\n {cmdstr}')
+        
+        # run
+        call(cmdstr, rootname=self.er.rootname)

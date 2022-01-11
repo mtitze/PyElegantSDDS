@@ -2,6 +2,7 @@ from .main import ElegantRunToolkit
 import pandas as pd
 import numpy as np
 import os
+from io import StringIO
 
 class misc(ElegantRunToolkit):
 

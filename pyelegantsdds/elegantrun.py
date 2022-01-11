@@ -8,14 +8,8 @@ A module containing the class ElegantRun to run Elegant simulations in
 a singularity container.
 
 """
-
-import shlex
-import subprocess as subp
-from io import StringIO
-
-import numpy as np
-
 from .elegant_command import ElegantCommandFile
+from .tools.shell_process import call
 
 # ==============================================================================
 #
@@ -143,35 +137,11 @@ class ElegantRun:
         self.commandfile.clear()
 
         # generate command string
-        # Debug: print(self.exec)
         cmdstr = "{} {}.ele".format(self.exec, self.rootname)
         print (f'Running command {cmdstr}')
         
         # run
-        errors, output = None, None
-        try:
-            task = subp.run(shlex.split(cmdstr), check=True, shell=False, stdout=subp.PIPE,
-                               stderr=subp.STDOUT)
-            errors = task.stderr
-            output = task.stdout
-        except subp.CalledProcessError as e:
-            print ('>>> AN ERROR HAS OCCURED! <<<')
-            print (f'Check {self.rootname}.stderr')
-            errors = e.output
-            
-        if output == None:
-            output = ''
-        else:
-            output = output.decode('utf-8')
-        with open(f'{self.rootname}.stdout', 'w') as f:
-            f.write(output)
-                   
-        if errors == None:
-            errors = ''
-        else:
-            errors = errors.decode('utf-8')
-        with open(f'{self.rootname}.stderr', 'w') as f:
-            f.write(errors)
+        call(cmdstr, rootname=self.rootname)
             
     ######################     
     # Elegant commands
