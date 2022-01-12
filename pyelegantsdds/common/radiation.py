@@ -10,9 +10,11 @@ class radiation(ElegantRunToolkit):
         self.er.add_alter_elements(name="*", type="CSBEND", item="SYNCH_RAD", value=synch_rad)
         self.er.add_alter_elements(name="*", type="CSBEND", item="USE_RAD_DIST", value=use_rad_dist)
         self.er.add_alter_elements(name="*", type="CSBEND", item="ISR", value=isr)
+        
         self.er.add_alter_elements(name="*", type="KQUAD", item="SYNCH_RAD", value=synch_rad)
         self.er.add_alter_elements(name="*", type="KQUAD", item="ISR", value=isr)
         self.er.add_alter_elements(name="*", type="KQUAD", item="ISR1PART", value=isr1part)
+        
         self.er.add_alter_elements(name="*", type="KSEXT", item="SYNCH_RAD", value=synch_rad)
         self.er.add_alter_elements(name="*", type="KSEXT", item="ISR", value=isr)
         self.er.add_alter_elements(name="*", type="KSEXT", item="ISR1PART", value=isr1part)

@@ -2,9 +2,12 @@ import shlex
 import subprocess as subp
 
 
-def call(cmdstr, rootname):
+def call(cmdstr, rootname, verbose=True):
     # general script to execute a shell command, and read the stderr from
     # the underlying executable root name
+    
+    if verbose:
+        print (f'Running command\n {cmdstr}')
     
     errors, output = None, None
     try:

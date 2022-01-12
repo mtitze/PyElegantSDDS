@@ -1,4 +1,5 @@
 from .main import ElegantRunToolkit
+from .sdds import SDDS
 import pandas as pd
 import numpy as np
 import os

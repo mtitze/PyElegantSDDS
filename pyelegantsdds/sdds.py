@@ -745,13 +745,9 @@ class SDDS:
         subp.run(cmd, check=True, shell=True)
         self.sdds_scan = f"{self._ROOTNAME}.sdds"
         
-    def sort(self):
+    def sort(self, column='s'):
         # build command string
-        cmdstr = "{} sddssort -column={} {}".format(
-            self.sif,
-            's',
-            f'{self._ROOTNAME}.mmap',
-        )
+        cmdstr = "{} sddssort -column={} {}".format(self.sif, column, self._filename)
 
         # run command
         p = subp.Popen(cmdstr, stdout=subp.PIPE, shell=True)

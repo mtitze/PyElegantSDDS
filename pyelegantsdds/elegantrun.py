@@ -123,7 +123,7 @@ class ElegantRun:
         self.clearCommands()
         self.clearCommandHistory()
 
-    def run(self, **kwargs):
+    def run(self, verbose=True, **kwargs):
         """
         Run the commandfile.
         """
@@ -136,12 +136,8 @@ class ElegantRun:
         self.commandfile.write()
         self.commandfile.clear()
 
-        # generate command string
         cmdstr = "{} {}.ele".format(self.exec, self.rootname)
-        print (f'Running command {cmdstr}')
-        
-        # run
-        call(cmdstr, rootname=self.rootname)
+        call(cmdstr, rootname=self.rootname, verbose=verbose)
             
     ######################     
     # Elegant commands
@@ -178,9 +174,10 @@ class ElegantRun:
         """
         self.commandfile.exists('run_setup')
         self.commandfile.addCommand(
-            "twiss_output", filename="%s.twi", 
+            "twiss_output", filename=kwargs.get('filename', '%s.twi'), 
             matched=kwargs.get('matched', 1),
             radiation_integrals=kwargs.get('radiation_integrals', 1) # TODO: change default value
+            concat_order=kwargs.get('concat_order', 3)
         )
 
     def add_closed_orbit(self, **kwargs):
