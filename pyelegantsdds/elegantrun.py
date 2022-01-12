@@ -109,6 +109,17 @@ class ElegantRun:
         write_parallel_elegant_script(rootname=self.rootname)
         write_parallel_run_script(self.sif, rootname=self.rootname)
         self.pelegant = f"{self.rootname}_run_pelegant.sh"
+        
+    def copy(self, **kwargs):
+        '''
+        Return a copy of this instance (without command history)
+        '''
+        return self.__class__(sif=kwargs.get('sif', self.sif), 
+                              lattice=kwargs.get('lattice', self.lattice),
+                              energy_gev=kwargs.get('energy_gev', self.energy_gev),
+                              beamline=kwargs.get('beamline', self.beamline),
+                              parallel=kwargs.get('parallel', self.parallel),
+                              rootname=kwargs.get('rootname', self.rootname))
 
     def clearCommands(self):
         """Clear the command list."""
@@ -176,7 +187,7 @@ class ElegantRun:
         self.commandfile.addCommand(
             "twiss_output", filename=kwargs.get('filename', '%s.twi'), 
             matched=kwargs.get('matched', 1),
-            radiation_integrals=kwargs.get('radiation_integrals', 1) # TODO: change default value
+            radiation_integrals=kwargs.get('radiation_integrals', 1), # TODO: change default value
             concat_order=kwargs.get('concat_order', 3)
         )
 
@@ -235,6 +246,8 @@ class ElegantRun:
             delta_negative_limit = kwargs.get('delta_negative_limit', -0.1),
             delta_positive_limit = kwargs.get('delta_positive_limit', 0.1),
             delta_step_size = kwargs.get('delta_step_size', 0.01),
+            include_name_pattern = kwargs.get('include_name_pattern', None),
+            include_type_pattern = kwargs.get('include_type_pattern', None),
             output_mode = kwargs.get('output_mode', 0) # Normally, elegant puts the values for positive and negative momentum aperture in different columns. Each element thus has a single row of data in the output file. If output_mode=1, elegant instead puts the values for positive and negative apertures in successive rows, with a reduced number of columns. This is mostly advantageous for the parallel version, since it allows using twice as many simultaneous processors. If output_mode=2, elegant tracks many more probe particles simultaneously, which is better for massively parallel systems. The number of particles tracked is the number of elements selected times the number of probe points between delta_negative_limit and delta_positive_limit. 
         )
 
@@ -258,6 +271,71 @@ class ElegantRun:
             verbosity=0,
             include_changes=kwargs.get("include_changes", 1),
             quadratic_spacing=kwargs.get("quadratic_spacing", 0),
-            full_grid_output=kwargs.get("full_grid_output", 1),
+            full_grid_output=kwargs.get("full_grid_output", 1)
         )
+        
+    def add_tscatter_elements(self, **kwargs):
+        """Add TSCATTER element(s) into the lattice.
+        
+        By default, a TSCATTER element is inserted in the lattice after each drift, bend, quadrupole and
+        sextupole element.
+        
+        Further details here:
+        https://www3.aps.anl.gov/forums/elegant/viewtopic.php?f=14&t=476&sid=467516201e9bd336985a828b20127b0b
+        
+        Parameters
+        ----------
+        save: str, optional
+            If given, lattice will be stored after the insertion of the TSCATTER elements.
+        """
+        self.commandfile.addCommand(
+            "insert_elements",
+            name=kwargs.get("name", "*"),
+            type=kwargs.get("type", "*[DBQS]*"),
+            exclude="",
+            s_start=kwargs.get("s_start", -1),
+            s_end=kwargs.get("s_end", -1),
+            skip=kwargs.get("skip", 1),
+            insert_before=kwargs.get("insert_before", 0),
+            add_at_end=kwargs.get("add_at_end", 0),
+            add_at_start=kwargs.get("add_at_start", 1),
+            element_def=kwargs.get("element_def", r'"TSC: TSCATTER"'))
 
+    def add_touschek_scatter(self, **kwargs):
+        '''
+        Add touschek_scatter command to the command list.
+        '''
+        
+        self.commandfile.addCommand(
+            "touschek_scatter",
+            charge=kwargs.get('charge', 0),
+            frequency=kwargs.get('frequency', 1),
+            emit_x=kwargs.get('emit_x', 0),
+            emit_nx=kwargs.get('emit_nx', 0),
+            emit_y=kwargs.get('emit_y', 0),
+            emit_ny=kwargs.get('emit_ny', 0),
+            sigma_dp=kwargs.get('sigma_dp', 0),
+            sigma_s=kwargs.get('sigma_s', 0),
+            Momentum_Aperture_scale=kwargs.get('Momentum_Aperture_scale', 0.85),
+            Momentum_Aperture=kwargs.get('Momentum_Aperture', None),
+            XDist=kwargs.get('XDist', None),
+            YDist=kwargs.get('YDist', None),
+            ZDist=kwargs.get('ZDist', None),
+            TranDist=kwargs.get('TranDist', None),
+            FullDist=kwargs.get('FullDist', None),
+            bunch=kwargs.get('bunch', '%s-%03ld.bun'),
+            loss=kwargs.get('loss', '%s-%03ld.los'),
+            distribution=kwargs.get('distribution', '%s-%03ld.dis'),
+            initial=kwargs.get('initial', '%s-%03ld.ini'),
+            output=kwargs.get('output', '%s-%03ld.out'),
+            nbins=kwargs.get('nbins', 100),
+            sbin_step=kwargs.get('sbin_step', 1),
+            n_simulated=kwargs.get('n_simulated', 5000000),
+            ignored_portion=kwargs.get('ignored_portion', 0.01),
+            i_start=kwargs.get('i_start', 0),
+            i_end=kwargs.get('i_end', 1),
+            do_track=kwargs.get('do_track', 0),
+            match_position_only=kwargs.get('match_position_only', 0),
+            overwrite_files=kwargs.get('overwrite_files', 1),
+            verbosity=kwargs.get('verbosity', 0)
+        )

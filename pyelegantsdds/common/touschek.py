@@ -52,34 +52,6 @@ class touschek(ElegantRunToolkit):
         # load output from the SDDS Touschek-lifetime file
         return SDDS(self.er.sif, f"{self.er.rootname}.{outstr}", 0)
         
-    
-    def add_tscatter(self, **kwargs):
-        """Add TSCATTER element(s) into the lattice.
-        
-        By default, a TSCATTER element is inserted in the lattice after each drift, bend, quadrupole and
-        sextupole element.
-        
-        Further details here:
-        https://www3.aps.anl.gov/forums/elegant/viewtopic.php?f=14&t=476&sid=467516201e9bd336985a828b20127b0b
-        
-        Parameters
-        ----------
-        save: str, optional
-            If given, lattice will be stored after the insertion of the TSCATTER elements.
-        """
-        self.er.commandfile.addCommand(
-            "insert_elements",
-            name=kwargs.get("name", "*"),
-            type=kwargs.get("type", "*[DBQS]*"),
-            exclude="",
-            s_start=kwargs.get("s_start", -1),
-            s_end=kwargs.get("s_end", -1),
-            skip=kwargs.get("skip", 1),
-            insert_before=kwargs.get("insert_before", 0),
-            add_at_end=kwargs.get("add_at_end", 0),
-            add_at_start=kwargs.get("add_at_start", 1),
-            element_def=kwargs.get("element_def", r'"TSC: TSCATTER"'))
-        
         
     def prepare_tscatter(self, n_passes, add_watch_start=True, rf=0, rad=True, verbose=True, **kwargs):
         '''
@@ -114,7 +86,7 @@ class touschek(ElegantRunToolkit):
             msc.add_watch_at_start()
 
         # add elements at which to compute the Touschek scattering events
-        self.add_tscatter(**kwargs)
+        self.er.add_tscatter_elements(**kwargs)
         
         # save modified lattice to new file for later use in self.run_tscatter
         self.tsc_lattice_name = f'{self.er.rootname}_tsc.lte'    
@@ -142,7 +114,6 @@ class touschek(ElegantRunToolkit):
         sdds_mmap = SDDS(self.er.sif, self.tsc_dynmomap_file, 0, rootname=self.er.rootname)
         sdds_mmap.sort() # sort by s (default). Required if running Pelegant (see https://ops.aps.anl.gov/manuals/elegant_latest/elegantsu50.html#x58-570007.40)
         # store the results locally for convenience
- 
         self.tsc_dynmomap_data = sdds_mmap.getColumnValues()
         
         # load the SDDS twiss data & sort them according to s
@@ -152,25 +123,52 @@ class touschek(ElegantRunToolkit):
         self.tsc_twiss = sdds_twiss.getColumnValues()
         
         
-    def run_tscatter(self, n_passes, verbose=True, **kwargs):
+    def run_tscatter(self, n_passes, sdds_beam_file, verbose=True, **kwargs):
+        
+        # check input consistency
+        assert 'charge' in kwargs.keys(), 'charge must be provided.'
+        assert kwargs['charge'] != 0, 'charge must be non-zero.'
+        
+        assert 'emit_x' in kwargs.keys() or 'emit_nx' in kwargs.keys(), 'emit_x or emit_nx must be provided.'
+        assert 'emit_y' in kwargs.keys() or 'emit_ny' in kwargs.keys(), 'emit_y or emit_ny must be provided.'
+        
+        assert 'sigma_s' in kwargs.keys(), 'sigma_s must be provided.'
+        assert 'sigma_dp' in kwargs.keys(), 'sigma_dp must be provided.'
         
         if not 'tsc_lattice_name' in kwargs.keys():
-            assert hasattr(self, 'tsc_lattice_name'), "A lattice file needs to be provided. Run self.prepare_tscatter or provide the file by the 'tsc_lattice_name' argument."
+            assert hasattr(self, 'tsc_lattice_name'), "A lattice file needs to be provided. Run self.prepare_tscatter or provide the file by a 'tsc_lattice_name' argument."
             tsc_lattice_name = self.tsc_lattice_name
         else:
             tsc_lattice_name = kwargs['tsc_lattice_name']
             
+        if not 'Momentum_Aperture' in kwargs.keys():
+            assert hasattr(self, 'tsc_dynmomap_file'), "A dynamic momentum aperture file needs to be provided. Run self.prepare_tscatter or provide the file by a 'Momentum_Aperture' argument."
+            kwargs['Momentum_Aperture'] = self.tsc_dynmomap_file
+            
         if verbose:
             print (f'Touschek scatter run using lattice:\n {tsc_lattice_name}')
             
-        
-        
-        '''self.er.commandfile.addCommand("run_control", n_passes=n_passes)
-
+        # copy current ElegantRun parameters, now using the lattice containing the TSC elements 
+        er_for_tsc = self.er.copy(lattice=tsc_lattice_name)
+       
+        er_for_tsc.add_run_setup(**kwargs) # N.B. only 3 keys are checked here at the moment, and they do not agree with any keys in the add_tscatter command below.
+       
+        # a twiss calculation is necessary prior to performing touschek_scatter
+        er_for_tsc.add_twiss_output(matched=1, radiation_integrals=1)
+      
+        # define input for scatter simulation
+        er_for_tsc.commandfile.addCommand("run_control", n_passes=n_passes)
         #self.commandfile.addCommand("bunched_beam")
-        self.er.commandfile.addCommand(
+        er_for_tsc.commandfile.addCommand(
             "sdds_beam",
             input=sdds_beam_file,
             input_type='"elegant"',
-        )'''
-            
+        )
+
+        # add the touschek_scatter command
+        er_for_tsc.add_touschek_scatter(**kwargs)
+
+        # run everything
+        er_for_tsc.run()
+
+
