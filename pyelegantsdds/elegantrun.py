@@ -182,13 +182,44 @@ class ElegantRun:
     def add_twiss_output(self, **kwargs):
         """
         Add basic twiss.
+        
+        Resonance driving terms (according to https://ops.aps.anl.gov/manuals/elegant_latest/elegantsu79.html#x87-860007.69):
+        Term Name	Explanation
+        h11001 	drives x chromaticity
+        h00111 	drives y chromaticity
+        h20001 	drives synchro-betatron resonances
+        h00201 	drives momentum-dependence of beta functions
+        h10002 	drives second order dispersion
+        h21000 	drives νx
+        h30000 	drives 3νx
+        h10110 	drives νx
+        h10020 	drives νx - 2νy
+        h10200 	drives νx + 2νy
+        h22000 	drives dνx∕dJx
+        h11110 	drives dνx∕dJy
+        h00220 	drives dνy∕dJy
+        h31000 	drives 2νx
+        h40000 	drives 4νx
+        h20110 	drives 2νx
+        h11200 	drives 2νy
+        h20020 	drives 2νx - 2νy
+        h20200 	drives 2νx + 2νy
+        h00310 	drives 2νy
+        h00400 	drives 4νy
         """
+        concat_order = kwargs.get('concat_order', 3)
+        higher_order_chromaticity = kwargs.get('higher_order_chromaticity', 1)
+        if concat_order < 2 and higher_order_chromaticity != 0:
+            raise RuntimeError('If higher_order_chromaticity != 0, then it is necessary to set concat_order >= 3.') # see https://ops.aps.anl.gov/manuals/elegant_latest/elegantsu79.html#x87-860007.69
+        
         self.commandfile.exists('run_setup')
         self.commandfile.addCommand(
             "twiss_output", filename=kwargs.get('filename', '%s.twi'), 
             matched=kwargs.get('matched', 1),
-            radiation_integrals=kwargs.get('radiation_integrals', 1), # TODO: change default value
-            concat_order=kwargs.get('concat_order', 3)
+            radiation_integrals=kwargs.get('radiation_integrals', 1),
+            concat_order=concat_order,
+            higher_order_chromaticity=higher_order_chromaticity,
+            compute_driving_terms=kwargs.get('compute_driving_terms', 1)
         )
 
     def add_closed_orbit(self, **kwargs):
@@ -199,6 +230,25 @@ class ElegantRun:
             "closed_orbit",
             output=kwargs.get('output', '%s.clo'),
             tracking_turns=kwargs.get('tracking_turns', 256)
+        )
+        
+    def add_moments_output(self, **kwargs):
+        '''
+        Add moments_output command.
+        '''
+        # N.B:
+        # parameter tracking_based_diffusion_matrix_particles may require update of Elegant ...
+
+        self.commandfile.addCommand(
+            "moments_output",
+            filename=kwargs.get('filename', '%s.mom'),
+            output_at_each_step=kwargs.get('output_at_each_step', 0),
+            output_before_tune_correction=kwargs.get('output_before_tune_correction', 0),
+            final_values_only=kwargs.get('final_values_only', 0),
+            matched=kwargs.get('matched', 1),
+            equilibrium=kwargs.get('equilibrium', 1),
+            radiation=kwargs.get('radiation', 1),
+            n_slices=kwargs.get('n_slices', 10)
         )
         
     def add_vary_element(self, **kwargs):
@@ -250,29 +300,6 @@ class ElegantRun:
             include_type_pattern = kwargs.get('include_type_pattern', None),
             output_mode = kwargs.get('output_mode', 0) # Normally, elegant puts the values for positive and negative momentum aperture in different columns. Each element thus has a single row of data in the output file. If output_mode=1, elegant instead puts the values for positive and negative apertures in successive rows, with a reduced number of columns. This is mostly advantageous for the parallel version, since it allows using twice as many simultaneous processors. If output_mode=2, elegant tracks many more probe particles simultaneously, which is better for massively parallel systems. The number of particles tracked is the number of elements selected times the number of probe points between delta_negative_limit and delta_positive_limit. 
         )
-
-    def add_frequency_map(self, **kwargs):
-        """
-        Add elegant standard fma command.
-        """
-
-        self.commandfile.addCommand(
-            "frequency_map",
-            output="%s.fma",
-            xmin=kwargs.get("xmin", -0.1),
-            xmax=kwargs.get("xmax", 0.1),
-            ymin=kwargs.get("ymin", 1e-6),
-            ymax=kwargs.get("ymax", 0.1),
-            delta_min=kwargs.get("delta_min", 0),
-            delta_max=kwargs.get("delta_max", 0),
-            nx=kwargs.get("nx", 21),
-            ny=kwargs.get("ny", 21),
-            ndelta=kwargs.get("ndelta", 1),
-            verbosity=0,
-            include_changes=kwargs.get("include_changes", 1),
-            quadratic_spacing=kwargs.get("quadratic_spacing", 0),
-            full_grid_output=kwargs.get("full_grid_output", 1)
-        )
         
     def add_tscatter_elements(self, **kwargs):
         """Add TSCATTER element(s) into the lattice.
@@ -288,6 +315,11 @@ class ElegantRun:
         save: str, optional
             If given, lattice will be stored after the insertion of the TSCATTER elements.
         """
+        
+        # N.B. add_at_end = 1 and add_at_start = 1 are required due to this update:
+        # https://ops.aps.anl.gov/manuals/elegant_latest/elegantsu260.html#x274-42800013.23
+        
+        
         self.commandfile.addCommand(
             "insert_elements",
             name=kwargs.get("name", "*"),
@@ -297,7 +329,7 @@ class ElegantRun:
             s_end=kwargs.get("s_end", -1),
             skip=kwargs.get("skip", 1),
             insert_before=kwargs.get("insert_before", 0),
-            add_at_end=kwargs.get("add_at_end", 0),
+            add_at_end=kwargs.get("add_at_end", 1),
             add_at_start=kwargs.get("add_at_start", 1),
             element_def=kwargs.get("element_def", r'"TSC: TSCATTER"'))
 
@@ -311,9 +343,9 @@ class ElegantRun:
             charge=kwargs.get('charge', 0),
             frequency=kwargs.get('frequency', 1),
             emit_x=kwargs.get('emit_x', 0),
-            emit_nx=kwargs.get('emit_nx', 0),
+            #emit_nx=kwargs.get('emit_nx', 0),
             emit_y=kwargs.get('emit_y', 0),
-            emit_ny=kwargs.get('emit_ny', 0),
+            #emit_ny=kwargs.get('emit_ny', 0),
             sigma_dp=kwargs.get('sigma_dp', 0),
             sigma_s=kwargs.get('sigma_s', 0),
             Momentum_Aperture_scale=kwargs.get('Momentum_Aperture_scale', 0.85),
@@ -338,4 +370,43 @@ class ElegantRun:
             match_position_only=kwargs.get('match_position_only', 0),
             overwrite_files=kwargs.get('overwrite_files', 1),
             verbosity=kwargs.get('verbosity', 0)
+        )
+        
+    def add_floor_coordinates(self, **kwargs):
+        '''
+        Add floor_coordinates command.
+        '''
+        self.commandfile.addCommand(
+            "floor_coordinates",
+            filename='%s.flr',
+            X0=kwargs.get('x0', 0.0),  
+            Z0=kwargs.get('z0', 0.0),  
+            theta0=kwargs.get('theta0', 0.0),
+            include_vertices=kwargs.get('include_vertices', 0),  
+            vertices_only=kwargs.get('vertices_only', 0),  
+            magnet_centers=kwargs.get('magnet_centers', 0), 
+            store_vertices=kwargs.get('store_vertices', 0)  
+        )
+        
+    def add_frequency_map(self, **kwargs):
+        """
+        Add elegant standard fma command.
+        """
+
+        self.commandfile.addCommand(
+            "frequency_map",
+            output="%s.fma",
+            xmin=kwargs.get("xmin", -0.1),
+            xmax=kwargs.get("xmax", 0.1),
+            ymin=kwargs.get("ymin", 1e-6),
+            ymax=kwargs.get("ymax", 0.1),
+            delta_min=kwargs.get("delta_min", 0),
+            delta_max=kwargs.get("delta_max", 0),
+            nx=kwargs.get("nx", 21),
+            ny=kwargs.get("ny", 21),
+            ndelta=kwargs.get("ndelta", 1),
+            verbosity=0,
+            include_changes=kwargs.get("include_changes", 1),
+            quadratic_spacing=kwargs.get("quadratic_spacing", 0),
+            full_grid_output=kwargs.get("full_grid_output", 1)
         )

@@ -53,7 +53,7 @@ class touschek(ElegantRunToolkit):
         return SDDS(self.er.sif, f"{self.er.rootname}.{outstr}", 0)
         
         
-    def prepare_tscatter(self, n_passes, add_watch_start=True, rf=0, rad=True, verbose=True, **kwargs):
+    def prepare_tscatter(self, n_passes, add_watch_start=True, rf=0, rad=True, sort=True, verbose=True, **kwargs):
         '''
         Prepare the given lattice to be used with TSCATTER elements: TSCATTER elements are inserted into
         the lattice and the momentum aperture will be calculated.
@@ -112,13 +112,15 @@ class touschek(ElegantRunToolkit):
         
         # load the SDDS aperture data & sort them according to s
         sdds_mmap = SDDS(self.er.sif, self.tsc_dynmomap_file, 0, rootname=self.er.rootname)
-        sdds_mmap.sort() # sort by s (default). Required if running Pelegant (see https://ops.aps.anl.gov/manuals/elegant_latest/elegantsu50.html#x58-570007.40)
+        if sort:
+            sdds_mmap.sort() # sort by s (default). Required if running Pelegant (see https://ops.aps.anl.gov/manuals/elegant_latest/elegantsu50.html#x58-570007.40)
         # store the results locally for convenience
         self.tsc_dynmomap_data = sdds_mmap.getColumnValues()
         
         # load the SDDS twiss data & sort them according to s
         sdds_twiss = SDDS(self.er.sif, self.tsc_twiss_name, 0, rootname=self.er.rootname)
-        sdds_twiss.sort() # sort by s (default).
+        if sort:
+            sdds_twiss.sort() # sort by s (default).
         # store the results locally for convenience
         self.tsc_twiss = sdds_twiss.getColumnValues()
         
@@ -155,16 +157,20 @@ class touschek(ElegantRunToolkit):
        
         # a twiss calculation is necessary prior to performing touschek_scatter
         er_for_tsc.add_twiss_output(matched=1, radiation_integrals=1)
-      
-        # define input for scatter simulation
+       
+        # define the number of turns to track
         er_for_tsc.commandfile.addCommand("run_control", n_passes=n_passes)
+      
+        '''# define input for scatter simulation
         #self.commandfile.addCommand("bunched_beam")
         er_for_tsc.commandfile.addCommand(
             "sdds_beam",
             input=sdds_beam_file,
             input_type='"elegant"',
         )
-
+        TODO: to be used in the touschek_scatter input
+        '''
+        
         # add the touschek_scatter command
         er_for_tsc.add_touschek_scatter(**kwargs)
 
