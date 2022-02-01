@@ -165,7 +165,7 @@ class ElegantRun:
             use_beamline=self.beamline,
             p_central_mev=self.energy_gev*1e3,
             # centroid="%s.cen",
-            default_order=kwargs.get("default_order", 2),
+            default_order=kwargs.get("default_order", 3),
             concat_order=kwargs.get("concat_order", 0),
             rootname=self.rootname,
             losses="%s.lost",
