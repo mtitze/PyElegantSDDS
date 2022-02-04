@@ -2,16 +2,18 @@ import pandas as pd
 import numpy as np
 import warnings
 
-def augment_elegant_optics(sdds_twi, sdds_params, params_oi=['L', 'ANGLE', 'K1', 'K2', 'K3'], verbose=True, 
+from ..sdds import SDDS
+
+def augment_elegant_optics(df_twi, df_params, params_oi=['L', 'ANGLE', 'K1', 'K2', 'K3'], verbose=True, 
                            add_at_start=True, **kwargs):
     '''
     Parameters
     ----------
-    sdds_twi:
-        SDDS object created from the twiss file of a run.
+    df_twi:
+        Pandas dataframe created from the twiss file of a run.
     
-    sdds_params:
-        SDDS object created from the params file of a run.
+    df_params:
+        Pandas dataframe created from the params file of a run.
         
     params_oi:
         List denoting the parameters of interest which should be added to the twiss data.
@@ -19,11 +21,8 @@ def augment_elegant_optics(sdds_twi, sdds_params, params_oi=['L', 'ANGLE', 'K1',
     add_at_start: boolean, optional
         If true, then the inverse radii and the bend angles are also added at the start of the bends.
     '''
-    twi_values = sdds_twi.getColumnValues()
-    params_values = sdds_params.getColumnValues()
-    
     # drop columns which are of no interest
-    params_values2 = params_values.drop(columns=['ParameterValueString', 'ElementOccurence', 'ElementGroup']).reset_index(drop=True)
+    params_values2 = df_params.drop(columns=['ParameterValueString', 'ElementOccurence', 'ElementGroup']).reset_index(drop=True)
 
     # drop all parameters (rows!) which are not of interest.
     params_values3 = params_values2[[x in params_oi for x in params_values2['ElementParameter']]].drop_duplicates().reset_index(drop=True)
@@ -32,13 +31,13 @@ def augment_elegant_optics(sdds_twi, sdds_params, params_oi=['L', 'ANGLE', 'K1',
     params_values4 = params_values3.pivot_table(index='ElementName', columns='ElementParameter', values='ParameterValue')
     
     # now merge the result with the twiss data:
-    original_elements = twi_values['ElementName'].unique()
-    result = pd.merge(twi_values, params_values4, on=['ElementName']).drop_duplicates().reset_index(drop=True)
+    original_elements = df_twi['ElementName'].unique()
+    result = pd.merge(df_twi, params_values4, on=['ElementName']).drop_duplicates().reset_index(drop=True)
     new_elements = result['ElementName'].unique()
     
     if verbose:
         diff = set(original_elements).difference(set(new_elements))
-        print (f'Length of original twiss table: {len(twi_values)}')
+        print (f'Length of original twiss table: {len(df_twi)}')
         print (f'     Length of new twiss table: {len(result)}')
         if len(diff) > 0:
             print (f'Dropped element(s):\n{diff}')
@@ -340,20 +339,32 @@ def nat_ex0(I2, I4, I5, gamma0):
     ex = Cq*gamma0**2/jx*I5/I2
     return ex
 
-def get_synchrotron_integrals(sdds_twi, sdds_params, verbose=True, **kwargs):
+def get_synchrotron_integrals(er, verbose=True, **kwargs):
     '''
     Compute the synchrotron integrals based on the Elegant optics functions and magnet parameters.
     The routine is meant to be an independent check for the internal routines of Elegant.
+    
+    Parameters
+    ----------
+    er: ElegantRun
+        An instance of an ElegantRun class
     '''
-    augment = augment_elegant_optics(sdds_twi, sdds_params, add_at_start=False, verbose=False)
+    sdds_twi = SDDS(er.sif, f"{er.rootname}.twi", 0, rootname=er.rootname)
+    sdds_params = SDDS(er.sif, f"{er.rootname}.params", 0, rootname=er.rootname)
+
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    df_params = sdds_params.getColumnValues()
+    df_twi = sdds_twi.getColumnValues()
+    twiss_params = sdds_twi.getParameterValues()
+    warnings.filterwarnings("default", category=FutureWarning) 
+    
+    augment = augment_elegant_optics(df_twi, df_params, add_at_start=False, verbose=False)
     optics_dict = get_refined_optics_cfm(augment, **kwargs)
         
     si_dict = compute_synchrotron_integrals(**optics_dict)
     si_dict_ip = compute_synchrotron_integrals(ri=optics_dict['ri'], etax=optics_dict['etax_ip'], etapx=optics_dict['etapx_ip'],
                                                ds=optics_dict['ds'], k1=optics_dict['k1'], alphax=optics_dict['alphax_ip'],
                                                betax=optics_dict['betax_ip'], gammax=optics_dict['gammax_ip'])
-
-
     
     out = {}
     out.update(optics_dict)
@@ -361,14 +372,11 @@ def get_synchrotron_integrals(sdds_twi, sdds_params, verbose=True, **kwargs):
     out.update({k + '_ip': si_dict_ip[k] for k in si_dict_ip.keys()})
     
     # also get the legacy parameters for comparison
-    warnings.filterwarnings("ignore", category=FutureWarning) 
-    dftwi = sdds_twi.getParameterValues()
-    warnings.filterwarnings("default", category=FutureWarning) 
     for k in range(1, 6):
-        out[f"I{k}_elegant"] = dftwi[f"I{k}"]
-    out["ex0_elegant"] = dftwi["ex0"]
+        out[f"I{k}_elegant"] = twiss_params[f"I{k}"]
+    out["ex0_elegant"] = twiss_params["ex0"]
     
-    out["ex0"] = nat_ex0(I2=out['I2'], I4=out['I4'], I5=out['I5'], gamma0=dftwi['pCentral'])
+    out["ex0"] = nat_ex0(I2=out['I2'], I4=out['I4'], I5=out['I5'], gamma0=twiss_params['pCentral'])
     
     if verbose:
         print (f"n_slices: {out['n_slices']}")
